@@ -1,0 +1,100 @@
+services:
+  admin-django:
+    image: exponentialit/admin-django:v1.0.0-dev
+    secrets:
+      - source: regcred
+        target: /.docker/config.json
+    env_file:
+      - ./envs/django.env
+    volumes:
+      - staticfiles:/app/config/staticfiles  # Volumen compartido
+    networks:
+      - app_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+
+  orchestrator:
+    image: exponentialit/orchestrator:v1.0.0-dev
+    env_file:
+      - ./envs/orchestrator.env
+    environment:
+      RUNNING_IN_DOCKER: '1'
+    networks:
+      - app_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  openai-integration:
+    image: exponentialit/openai-integration:v1.0.0-dev
+    env_file:
+      - ./envs/openai.env
+    environment:
+      RUNNING_IN_DOCKER: '1'
+    networks:
+      - app_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  zoho-integration:
+    image: exponentialit/zoho-integration:v1.0.0-dev
+    env_file:
+      - ./envs/zoho.env
+    environment:
+      RUNNING_IN_DOCKER: '1'
+    networks:
+      - app_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  odoo-integration:
+    image: exponentialit/odoo-integration:v1.0.0-dev
+    env_file:
+      - ./envs/odoo.env
+    environment:
+      RUNNING_IN_DOCKER: '1'
+    networks:
+      - app_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  nginx:
+    image: exponentialit/nginx:v1.0.0-dev
+    ports:
+      - "80:80"
+      - "443:443"   # ✅ Habilitar HTTPS
+    volumes:
+      - /var/www/certbot:/var/www/certbot
+      - staticfiles:/static:ro # Archivos estáticos
+      - /etc/letsencrypt/live/testapi.exponentialit.net:/etc/letsencrypt/live/testapi.exponentialit.net:ro
+      - /etc/letsencrypt/archive/testapi.exponentialit.net:/etc/letsencrypt/archive/testapi.exponentialit.net:ro
+    networks:
+      - app_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+networks:
+  app_net:
+    external: true
+
+volumes:
+  staticfiles:
+    driver: local  # Puedes cambiar a nfs o glusterfs si usas múltiples nodos
+
+secrets:
+  regcred:
+    external: true
