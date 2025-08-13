@@ -1,6 +1,6 @@
 services:
   admin-django:
-    image: exponentialit/admin-django:v1.0.3-dev
+    image: exponentialit/admin-django:v1.1.0-dev
     secrets:
       - source: regcred
         target: /.docker/config.json
@@ -19,7 +19,7 @@ services:
           - node.role == manager
 
   orchestrator:
-    image: exponentialit/orchestrator:v1.0.3-dev
+    image: exponentialit/orchestrator:v1.1.0-dev
     env_file:
       - ./envs/orchestrator.env
     environment:
@@ -32,7 +32,7 @@ services:
         condition: on-failure
 
   openai-integration:
-    image: exponentialit/openai-integration:v1.0.3-dev
+    image: exponentialit/openai-integration:v1.1.0-dev
     env_file:
       - ./envs/openai.env
     environment:
@@ -45,7 +45,7 @@ services:
         condition: on-failure
 
   zoho-integration:
-    image: exponentialit/zoho-integration:v1.0.3-dev
+    image: exponentialit/zoho-integration:v1.1.0-dev
     env_file:
       - ./envs/zoho.env
     environment:
@@ -58,7 +58,7 @@ services:
         condition: on-failure
 
   odoo-integration:
-    image: exponentialit/odoo-integration:v1.0.3-dev
+    image: exponentialit/odoo-integration:v1.1.0-dev
     env_file:
       - ./envs/odoo.env
     environment:
@@ -71,7 +71,7 @@ services:
         condition: on-failure
 
   nginx:
-    image: exponentialit/nginx:v1.0.3-dev
+    image: exponentialit/nginx:v1.1.0-dev
     ports:
       - "80:80"
       - "443:443"   # ✅ Habilitar HTTPS
