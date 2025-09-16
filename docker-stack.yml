@@ -1,6 +1,6 @@
 services:
   admin-django:
-    image: exponentialit/admin-django:v1.2.0-dev
+    image: exponentialit/admin-django:v2.0.0-dev
     secrets:
       - source: regcred
         target: /.docker/config.json
@@ -19,7 +19,7 @@ services:
           - node.role == manager
 
   orchestrator:
-    image: exponentialit/orchestrator:v1.2.0-dev
+    image: exponentialit/orchestrator:v2.0.0-dev
     env_file:
       - ./envs/orchestrator.env
     environment:
@@ -31,10 +31,10 @@ services:
       restart_policy:
         condition: on-failure
 
-  openai-integration:
-    image: exponentialit/openai-integration:v1.2.0-dev
+  logger-integration:
+    image: exponentialit/logger-integration:v2.0.0-dev
     env_file:
-      - ./envs/openai.env
+      - ./envs/logger.env
     environment:
       RUNNING_IN_DOCKER: '1'
     networks:
@@ -45,7 +45,7 @@ services:
         condition: on-failure
 
   claudeai-integration:
-    image: exponentialit/claudeai-integration:v1.2.0-dev
+    image: exponentialit/claudeai-integration:v2.0.0-dev
     env_file:
       - ./envs/claudeai.env
     environment:
@@ -56,22 +56,9 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
-
-  zoho-integration:
-    image: exponentialit/zoho-integration:v1.2.0-dev
-    env_file:
-      - ./envs/zoho.env
-    environment:
-      RUNNING_IN_DOCKER: '1'
-    networks:
-      - app_net
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-
+        
   odoo-integration:
-    image: exponentialit/odoo-integration:v1.2.0-dev
+    image: exponentialit/odoo-integration:v2.0.0-dev
     env_file:
       - ./envs/odoo.env
     environment:
@@ -84,7 +71,7 @@ services:
         condition: on-failure
 
   nginx:
-    image: exponentialit/nginx:v1.2.0-dev
+    image: exponentialit/nginx:v2.0.0-dev
     ports:
       - "80:80"
       - "443:443"   # ✅ Habilitar HTTPS

@@ -3,7 +3,7 @@ REGISTRY=exponentialit
 STACK_NAME = exponentialit_stack
 COMPOSE_FILE = docker-stack.yml
 NETWORK = app_net
-VERSION = v1.2.0-dev
+VERSION = v2.0.0-dev
 
 # ------------------------------------------------------------------------------
 # Inicialización y redes
@@ -105,7 +105,9 @@ logs-nginx: ## Logs de nginx
 logs-claudeai: ## Logs de Claude AI
 	@docker service logs $(STACK_NAME)_claudeai-integration
 
-logs: logs-admin logs-orchestrator logs-zoho logs-openai logs-odoo logs-claudeai logs-nginx  ## Muestra todos los logs
+logs-logger: ## Logs del logger
+	@docker service logs $(STACK_NAME)_logger-integration
+logs: logs-admin logs-orchestrator logs-odoo logs-claudeai logs-logger logs-nginx  ## Muestra todos los logs
 
 logs-admin-follow: ## Logs en tiempo real de admin-django
 	@docker service logs -f $(STACK_NAME)_admin-django
@@ -122,8 +124,11 @@ logs-odoo-follow: ## Logs en tiempo real de odoo-integration
 logs-openai-follow: ## Logs en tiempo real de openai-integration
 	@docker service logs -f $(STACK_NAME)_openai-integration
 
-logs-openai-follow: ## Logs en tiempo real de claudeai-integration
+logs-claudeai-follow: ## Logs en tiempo real de claudeai-integration
 	@docker service logs -f $(STACK_NAME)_claudeai-integration
+
+logs-logger-follow: ## Logs en tiempo real de nginx
+	@docker service logs -f $(STACK_NAME)_logger-integration
 
 logs-nginx-follow: ## Logs en tiempo real de nginx
 	@docker service logs -f $(STACK_NAME)_nginx
@@ -157,10 +162,13 @@ reload-openai: ## Reinicia el servicio openai-integration
 reload-claudeai: ## Reinicia el servicio claudeai-integration
 	@docker service update --force $(STACK_NAME)_claudeai-integration
 
+reload-logger: ## Reinicia el servicio logger-integration
+	@docker service update --force $(STACK_NAME)_logger-integration
+
 reload-nginx: ## Reinicia el servicio nginx
 	@docker service update --force $(STACK_NAME)_nginx
 
-reload: reload-admin reload-orchestrator reload-zoho reload-odoo reload-openai reload-claudeai reload-nginx ## Reinicia todos los servicios
+reload: reload-admin reload-orchestrator reload-odoo reload-logger reload-claudeai reload-nginx ## Reinicia todos los servicios
 
 # ------------------------------------------------------------------------------
 # Shell en contenedores
@@ -183,6 +191,9 @@ shell-openai: ## Accede al contenedor openai-integration
 shell-claudeai: ## Accede al contenedor claudeai-integration
 	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_claudeai-integration" --format "{{.ID}}") sh
 
+shell-logger: ## Accede al contenedor logger-integration
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_logger-integration" --format "{{.ID}}") sh
+
 shell-nginx: ## Accede al contenedor nginx
 	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_nginx" --format "{{.ID}}") sh
 
@@ -204,8 +215,7 @@ build-orchestrator: ## Construye imagen Docker de orchestrator
 push-orchestrator: ## Sube imagen Docker de orchestrator
 	docker push $(REGISTRY)/orchestrator:$(VERSION)
 
-publish-orchestrator: build-orchestrator push-orchestrator ## Construye y sube imagen Docker de orchestrator
-	
+publish-orchestrator: build-orchestrator push-orchestrator ## Construye y sube imagen Docker de orchestrator	
 
 build-odoo: ## Construye imagen Docker de odoo-integration
 	docker build -t $(REGISTRY)/odoo-integration:$(VERSION) ./backend/services/odoo_integration
@@ -241,6 +251,14 @@ push-claudeai: ## Sube imagen Docker de claudeai-integration
 
 publish-claudeai: build-claudeai push-claudeai ## Construye y sube imagen Docker de build-claudeai
 
+build-logger: ## Construye imagen Docker de logger-integration
+	docker build -t $(REGISTRY)/logger-integration:$(VERSION) ./backend/services/logger_integration
+
+push-logger: ## Sube imagen Docker de logger-integration
+	docker push $(REGISTRY)/logger-integration:$(VERSION)
+
+publish-logger: build-logger push-logger ## Construye y sube imagen Docker de build-logger
+
 build-nginx: ## Construye imagen Docker de nginx
 	docker build -t $(REGISTRY)/nginx:$(VERSION) ./nginx
 
@@ -249,9 +267,9 @@ push-nginx: ## Sube imagen Docker de nginx
 
 publish-nginx: build-nginx push-nginx ## Construye y sube imagen Docker de build-nginx
 
-build: build-admin build-orchestrator build-odoo build-zoho build-openai build-claudeai build-nginx ## Construye todas las imágenes
-push: push-admin push-orchestrator push-odoo push-zoho push-openai push-claudeai push-nginx ## Sube todas las imágenes
-publish: publish-admin publish-orchestrator publish-odoo publish-zoho publish-openai publish-claudeai publish-nginx ## Publica todas las imagenes
+build: build-admin build-orchestrator build-odoo build-logger build-claudeai build-nginx ## Construye todas las imágenes
+push: push-admin push-orchestrator push-odoo push-logger push-claudeai push-nginx ## Sube todas las imágenes
+publish: publish-admin publish-orchestrator publish-odoo publish-logger publish-claudeai publish-nginx ## Publica todas las imagenes
 
 # ------------------------------------------------------------------------------
 # Variables de entorno
@@ -272,13 +290,15 @@ env-openai: ## Muestra variables de entorno de openai-integration
 	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_openai_integration" --format "{{.ID}}") printenv
 
 env-claudeai: ## Muestra variables de entorno de claudeai-integration
-	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_openai_integration" --format "{{.ID}}") printenv
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_claudeai_integration" --format "{{.ID}}") printenv
 
+env-logger: ## Muestra variables de entorno de logger-integration
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_logger_integration" --format "{{.ID}}") printenv
 
 env-nginx: ## Muestra variables de entorno de nginx
 	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_nginx" --format "{{.ID}}") printenv
 
-envs: env-admin env-orchestrator env-zoho env-openai env-odoo env-nginx ## Muestra todas las variables de entorno
+envs: env-admin env-orchestrator env-logger env-odoo env-claudeai env-nginx ## Muestra todas las variables de entorno
 
 
 # ------------------------------------------------------------------------------  
@@ -292,18 +312,18 @@ help: ## Muestra esta ayuda
 # Reglas PHONY  
 # ------------------------------------------------------------------------------  
 .PHONY: \
-  build build-admin build-nginx build-odoo build-openai build-claudeai build-orchestrator build-zoho \
+  build build-admin build-nginx build-odoo build-openai build-claudeai build-orchestrator build-zoho build-logger \
   clean create-network \
   deploy deploy-safe down \
-  env-admin env-nginx env-odoo env-openai env-orchestrator env-zoho env-claudeai envs \
+  env-admin env-nginx env-odoo env-openai env-orchestrator env-zoho env-claudeai env-logger envs \
   help \
   inspect \
-  logs logs-admin logs-nginx logs-odoo logs-openai logs-orchestrator logs-zoho logs-claudeai \
-  logs-admin-follow logs-nginx-follow logs-odoo-follow logs-openai-follow logs-orchestrator-follow logs-zoho-follow  logs-claudeai-follow\
+  logs logs-admin logs-nginx logs-odoo logs-openai logs-orchestrator logs-zoho logs-claudeai logs-logger \
+  logs-admin-follow logs-nginx-follow logs-odoo-follow logs-openai-follow logs-orchestrator-follow logs-zoho-follow  logs-claudeai-follow logs-logger-follow\
   logs-error-% \
   networks \
-  prune ps push push-admin push-nginx push-odoo push-openai push-orchestrator push-zoho push-claudeai \
-  reload reload-admin reload-nginx reload-odoo reload-openai reload-orchestrator reload-zoho reload-claudeai \
+  prune ps push push-admin push-nginx push-odoo push-openai push-orchestrator push-zoho push-claudeai push-logger \
+  reload reload-admin reload-nginx reload-odoo reload-openai reload-orchestrator reload-zoho reload-claudeai reload-logger \
   rm \
-  shell-admin shell-nginx shell-odoo shell-openai shell-orchestrator shell-zoho shell-claudeai \
+  shell-admin shell-nginx shell-odoo shell-openai shell-orchestrator shell-zoho shell-claudeai shell-logger \
   status swarm-init up
