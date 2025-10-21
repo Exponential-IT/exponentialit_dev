@@ -107,6 +107,7 @@ logs-claudeai: ## Logs de Claude AI
 
 logs-logger: ## Logs del logger
 	@docker service logs $(STACK_NAME)_logger-integration
+
 logs: logs-admin logs-orchestrator logs-odoo logs-claudeai logs-logger logs-nginx  ## Muestra todos los logs
 
 logs-admin-follow: ## Logs en tiempo real de admin-django
@@ -127,7 +128,7 @@ logs-openai-follow: ## Logs en tiempo real de openai-integration
 logs-claudeai-follow: ## Logs en tiempo real de claudeai-integration
 	@docker service logs -f $(STACK_NAME)_claudeai-integration
 
-logs-logger-follow: ## Logs en tiempo real de nginx
+logs-logger-follow: ## Logs en tiempo real de logger-integration
 	@docker service logs -f $(STACK_NAME)_logger-integration
 
 logs-nginx-follow: ## Logs en tiempo real de nginx
@@ -208,7 +209,7 @@ push-admin: ## Sube imagen Docker de admin-django
 
 publish-admin: build-admin push-admin ## Construye y sube imagen Docker de admin-django
 	
-  
+	
 build-orchestrator: ## Construye imagen Docker de orchestrator
 	docker build -t $(REGISTRY)/orchestrator:$(VERSION) ./backend/services/orchestrator
 
@@ -275,42 +276,63 @@ publish: publish-admin publish-orchestrator publish-odoo publish-logger publish-
 # Variables de entorno
 # ------------------------------------------------------------------------------
 env-admin: ## Muestra variables de entorno de admin-django
-	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_admin_django" --format "{{.ID}}") printenv
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_admin-django" --format "{{.ID}}") printenv
 
 env-orchestrator: ## Muestra variables de entorno de orchestrator
 	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_orchestrator" --format "{{.ID}}") printenv
 
 env-zoho: ## Muestra variables de entorno de zoho-integration
-	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_zoho_integration" --format "{{.ID}}") printenv
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_zoho-integration" --format "{{.ID}}") printenv
 
 env-odoo: ## Muestra variables de entorno de odoo-integration
-	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_odoo_integration" --format "{{.ID}}") printenv
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_odoo-integration" --format "{{.ID}}") printenv
 
 env-openai: ## Muestra variables de entorno de openai-integration
-	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_openai_integration" --format "{{.ID}}") printenv
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_openai-integration" --format "{{.ID}}") printenv
 
 env-claudeai: ## Muestra variables de entorno de claudeai-integration
-	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_claudeai_integration" --format "{{.ID}}") printenv
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_claudeai-integration" --format "{{.ID}}") printenv
 
 env-logger: ## Muestra variables de entorno de logger-integration
-	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_logger_integration" --format "{{.ID}}") printenv
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_logger-integration" --format "{{.ID}}") printenv
 
 env-nginx: ## Muestra variables de entorno de nginx
 	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_nginx" --format "{{.ID}}") printenv
 
 envs: env-admin env-orchestrator env-logger env-odoo env-claudeai env-nginx ## Muestra todas las variables de entorno
 
+# ------------------------------------------------------------------------------
+# Utilidades Nginx y Gunicorn (opcionales)
+# ------------------------------------------------------------------------------
+nginx-test: ## Valida la configuración de Nginx (nginx -t) dentro del contenedor
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_nginx" --format "{{.ID}}") nginx -t
 
-# ------------------------------------------------------------------------------  
-# Ayuda  
-# ------------------------------------------------------------------------------  
-help: ## Muestra esta ayuda  
-	@echo "📖 Comandos disponibles:"  
-	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'  
-  
-# ------------------------------------------------------------------------------  
-# Reglas PHONY  
-# ------------------------------------------------------------------------------  
+nginx-reload-config: ## Recarga la configuración de Nginx (nginx -s reload) dentro del contenedor
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_nginx" --format "{{.ID}}") nginx -s reload
+
+logs-nginx-access: ## Tail de access.log dentro del contenedor Nginx
+	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_nginx" --format "{{.ID}}") sh -lc 'tail -n 200 -F /var/log/nginx/access.log'
+
+gunicorn-no-accesslog: ## Desactiva access log de Gunicorn en admin-django (deja solo error log)
+	@docker service update \
+	  --env-add GUNICORN_CMD_ARGS="--error-logfile - --access-logfile ''" \
+	  $(STACK_NAME)_admin-django
+
+gunicorn-default-logs: ## Restaura logs por defecto de Gunicorn en admin-django
+	@docker service update \
+	  --env-rm GUNICORN_CMD_ARGS \
+	  $(STACK_NAME)_admin-django
+
+# ------------------------------------------------------------------------------
+# Ayuda
+# ------------------------------------------------------------------------------
+help: ## Muestra esta ayuda
+	@echo "📖 Comandos disponibles:"
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+# ------------------------------------------------------------------------------
+# Reglas PHONY
+# ------------------------------------------------------------------------------
 .PHONY: \
   build build-admin build-nginx build-odoo build-openai build-claudeai build-orchestrator build-zoho build-logger \
   clean create-network \
@@ -319,11 +341,13 @@ help: ## Muestra esta ayuda
   help \
   inspect \
   logs logs-admin logs-nginx logs-odoo logs-openai logs-orchestrator logs-zoho logs-claudeai logs-logger \
-  logs-admin-follow logs-nginx-follow logs-odoo-follow logs-openai-follow logs-orchestrator-follow logs-zoho-follow  logs-claudeai-follow logs-logger-follow\
+  logs-admin-follow logs-nginx-follow logs-odoo-follow logs-openai-follow logs-orchestrator-follow logs-zoho-follow logs-claudeai-follow logs-logger-follow \
   logs-error-% \
   networks \
+  nginx-test nginx-reload-config logs-nginx-access \
   prune ps push push-admin push-nginx push-odoo push-openai push-orchestrator push-zoho push-claudeai push-logger \
   reload reload-admin reload-nginx reload-odoo reload-openai reload-orchestrator reload-zoho reload-claudeai reload-logger \
   rm \
   shell-admin shell-nginx shell-odoo shell-openai shell-orchestrator shell-zoho shell-claudeai shell-logger \
-  status swarm-init up
+  status swarm-init up \
+  gunicorn-no-accesslog gunicorn-default-logs
