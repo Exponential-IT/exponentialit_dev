@@ -1,6 +1,6 @@
 services:
     admin-django:
-        image: exponentialit/admin-django:v2.2.2-dev
+        image: exponentialit/admin-django:v2.2.3-dev
         secrets:
             - source: regcred
               target: /.docker/config.json
