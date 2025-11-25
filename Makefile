@@ -1,9 +1,9 @@
 # Variables
 REGISTRY=exponentialit
-STACK_NAME = exponentialit_stack
-COMPOSE_FILE = docker-stack.yml
-NETWORK = app_net
-VERSION = v2.2.3-dev
+STACK_NAME=exponentialit_stack
+COMPOSE_FILE=docker-stack.yml
+NETWORK=app_net
+VERSION=v2.2.5-dev
 
 # ------------------------------------------------------------------------------
 # Inicialización y redes
@@ -32,9 +32,9 @@ inspect: ## Inspecciona detalles de la red overlay
 # ------------------------------------------------------------------------------
 # Despliegue
 # ------------------------------------------------------------------------------
-deploy: ## Despliega el stack completo con espera
+deploy: ## Despliega el stack completo con espera (con credenciales del registry)
 	@echo "🚀 Desplegando el stack '$(STACK_NAME)' con espera..."
-	@docker stack deploy --detach=false -c $(COMPOSE_FILE) $(STACK_NAME)
+	@docker stack deploy --with-registry-auth --detach=false -c $(COMPOSE_FILE) $(STACK_NAME)
 	@echo "🔍 Servicios activos del stack '$(STACK_NAME)':"
 	@docker service ls --filter label=com.docker.stack.namespace=$(STACK_NAME)
 
@@ -68,18 +68,25 @@ ps: ## Lista servicios activos del stack
 # ------------------------------------------------------------------------------
 rm: ## Elimina el stack desplegado
 	@echo "🗑️ Eliminando el stack '$(STACK_NAME)'..."
-	@docker stack rm $(STACK_NAME)
+	@docker stack rm $(STACK_NAME) || true
 
 clean: ## Elimina contenedores detenidos
 	@echo "🧹 Eliminando contenedores detenidos..."
-	@docker ps -aq | xargs docker rm -f || true
+	@cid=$$(docker ps -aq); \
+	if [ -n "$$cid" ]; then \
+		docker rm -f $$cid; \
+	else \
+		echo "✅ No hay contenedores detenidos."; \
+	fi
 
-prune: ## Elimina recursos no utilizados
+prune: ## Elimina recursos no utilizados (volúmenes incluidos)
 	@echo "🔥 Eliminando recursos no utilizados (volúmenes incluidos)..."
 	@docker system prune -af --volumes
 
 up: build deploy ## Compila y despliega todo
-down: rm clean prune ## Elimina todo (stack, contenedores, recursos)
+
+down: rm clean ## Elimina stack y contenedores (sin tocar imágenes ni volúmenes)
+down-full: rm clean prune ## Elimina todo (stack, contenedores, recursos, imágenes, volúmenes)
 
 # ------------------------------------------------------------------------------
 # Logs
@@ -108,7 +115,7 @@ logs-claudeai: ## Logs de Claude AI
 logs-logger: ## Logs del logger
 	@docker service logs $(STACK_NAME)_logger-integration
 
-logs: logs-admin logs-orchestrator logs-odoo logs-claudeai logs-logger logs-nginx  ## Muestra todos los logs
+logs: logs-admin logs-orchestrator logs-odoo logs-claudeai logs-logger logs-nginx ## Muestra todos los logs
 
 logs-admin-follow: ## Logs en tiempo real de admin-django
 	@docker service logs -f $(STACK_NAME)_admin-django
@@ -199,7 +206,7 @@ shell-nginx: ## Accede al contenedor nginx
 	@docker exec -it $$(docker ps --filter "name=$(STACK_NAME)_nginx" --format "{{.ID}}") sh
 
 # ------------------------------------------------------------------------------
-# Subir imagen
+# Build & Push de imágenes
 # ------------------------------------------------------------------------------
 build-admin: ## Construye imagen Docker de admin-django
 	docker build -t $(REGISTRY)/admin-django:$(VERSION) ./backend/django
@@ -208,15 +215,14 @@ push-admin: ## Sube imagen Docker de admin-django
 	docker push $(REGISTRY)/admin-django:$(VERSION)
 
 publish-admin: build-admin push-admin ## Construye y sube imagen Docker de admin-django
-	
-	
+
 build-orchestrator: ## Construye imagen Docker de orchestrator
 	docker build -t $(REGISTRY)/orchestrator:$(VERSION) ./backend/services/orchestrator
 
 push-orchestrator: ## Sube imagen Docker de orchestrator
 	docker push $(REGISTRY)/orchestrator:$(VERSION)
 
-publish-orchestrator: build-orchestrator push-orchestrator ## Construye y sube imagen Docker de orchestrator	
+publish-orchestrator: build-orchestrator push-orchestrator ## Construye y sube imagen Docker de orchestrator
 
 build-odoo: ## Construye imagen Docker de odoo-integration
 	docker build -t $(REGISTRY)/odoo-integration:$(VERSION) ./backend/services/odoo_integration
@@ -224,8 +230,7 @@ build-odoo: ## Construye imagen Docker de odoo-integration
 push-odoo: ## Sube imagen Docker de odoo-integration
 	docker push $(REGISTRY)/odoo-integration:$(VERSION)
 
-publish-odoo: build-odoo push-odoo ## Construye y sube imagen Docker de orchestrator
-
+publish-odoo: build-odoo push-odoo ## Construye y sube imagen Docker de odoo-integration
 
 build-zoho: ## Construye imagen Docker de zoho-integration
 	docker build -t $(REGISTRY)/zoho-integration:$(VERSION) ./backend/services/zoho_integration
@@ -235,14 +240,13 @@ push-zoho: ## Sube imagen Docker de zoho-integration
 
 publish-zoho: build-zoho push-zoho ## Construye y sube imagen Docker de zoho-integration
 
-
 build-openai: ## Construye imagen Docker de openai-integration
 	docker build -t $(REGISTRY)/openai-integration:$(VERSION) ./backend/services/openai_integration
 
 push-openai: ## Sube imagen Docker de openai-integration
 	docker push $(REGISTRY)/openai-integration:$(VERSION)
 
-publish-openai: build-openai push-openai ## Construye y sube imagen Docker de build-openai
+publish-openai: build-openai push-openai ## Construye y sube imagen Docker de openai-integration
 
 build-claudeai: ## Construye imagen Docker de claudeai-integration
 	docker build -t $(REGISTRY)/claudeai-integration:$(VERSION) ./backend/services/claudeai_integration
@@ -250,7 +254,7 @@ build-claudeai: ## Construye imagen Docker de claudeai-integration
 push-claudeai: ## Sube imagen Docker de claudeai-integration
 	docker push $(REGISTRY)/claudeai-integration:$(VERSION)
 
-publish-claudeai: build-claudeai push-claudeai ## Construye y sube imagen Docker de build-claudeai
+publish-claudeai: build-claudeai push-claudeai ## Construye y sube imagen Docker de claudeai-integration
 
 build-logger: ## Construye imagen Docker de logger-integration
 	docker build -t $(REGISTRY)/logger-integration:$(VERSION) ./backend/services/logger_integration
@@ -258,7 +262,7 @@ build-logger: ## Construye imagen Docker de logger-integration
 push-logger: ## Sube imagen Docker de logger-integration
 	docker push $(REGISTRY)/logger-integration:$(VERSION)
 
-publish-logger: build-logger push-logger ## Construye y sube imagen Docker de build-logger
+publish-logger: build-logger push-logger ## Construye y sube imagen Docker de logger-integration
 
 build-nginx: ## Construye imagen Docker de nginx
 	docker build -t $(REGISTRY)/nginx:$(VERSION) ./nginx
@@ -266,11 +270,11 @@ build-nginx: ## Construye imagen Docker de nginx
 push-nginx: ## Sube imagen Docker de nginx
 	docker push $(REGISTRY)/nginx:$(VERSION)
 
-publish-nginx: build-nginx push-nginx ## Construye y sube imagen Docker de build-nginx
+publish-nginx: build-nginx push-nginx ## Construye y sube imagen Docker de nginx
 
-build: build-admin build-orchestrator build-odoo build-logger build-claudeai build-nginx ## Construye todas las imágenes
-push: push-admin push-orchestrator push-odoo push-logger push-claudeai push-nginx ## Sube todas las imágenes
-publish: publish-admin publish-orchestrator publish-odoo publish-logger publish-claudeai publish-nginx ## Publica todas las imagenes
+build: build-admin build-orchestrator build-odoo build-zoho  build-logger build-claudeai build-nginx ## Construye todas las imágenes
+push: push-admin push-orchestrator push-odoo push-zoho push-logger push-claudeai push-nginx ## Sube todas las imágenes
+publish: publish-admin publish-orchestrator publish-odoo publish-zoho publish-logger publish-claudeai publish-nginx ## Publica todas las imagenes
 
 # ------------------------------------------------------------------------------
 # Variables de entorno
@@ -336,7 +340,7 @@ help: ## Muestra esta ayuda
 .PHONY: \
   build build-admin build-nginx build-odoo build-openai build-claudeai build-orchestrator build-zoho build-logger \
   clean create-network \
-  deploy deploy-safe down \
+  deploy deploy-safe down down-full \
   env-admin env-nginx env-odoo env-openai env-orchestrator env-zoho env-claudeai env-logger envs \
   help \
   inspect \
